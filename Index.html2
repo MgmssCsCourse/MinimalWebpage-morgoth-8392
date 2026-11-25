@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>JEMBOS – ESCAPE THE MONSTER</title>
+<style>
+:root{--r:#b3121c;--bg:#07070b;--t:#e9e4e4}
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--t);font-family:Georgia,"Times New Roman",serif;overflow:hidden;touch-action:none}
+#gl{position:fixed;inset:0;width:100%;height:100%}
+#vig{position:fixed;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 20vmin 7vmin #e00}
+#fl{position:fixed;inset:0;pointer-events:none;background:#fff;opacity:0;transition:opacity .6s}
+#ui{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,rgba(40,0,0,.82),rgba(0,0,0,.96));padding:env(safe-area-inset-top) 10px env(safe-area-inset-bottom)}
+.pn{display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center;max-height:100%;overflow:auto;width:min(560px,100%);padding:14px}
+h1{margin:0;font-size:clamp(2.4rem,9vw,4rem);letter-spacing:.3em;color:var(--r);text-shadow:0 0 18px #f00}
+h2{margin:0;color:var(--r)}h3{margin:0 0 6px;letter-spacing:.35em;font-weight:400}
+button{background:#14090b;color:var(--t);border:1px solid #6a1018;padding:10px 18px;font:inherit;font-size:1rem;cursor:pointer;width:100%;max-width:320px}
+button:hover{background:#3a0a10}button.pri{background:var(--r);font-weight:700}button:disabled,button.lk{opacity:.35}
+.st{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;font-size:.85rem;opacity:.85;margin-bottom:6px}
+.jb{color:#ffd24a;font-weight:700}
+.gr{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;width:100%}
+.cd{border:1px solid #4a1016;background:#100709;padding:8px;display:flex;flex-direction:column;gap:4px;align-items:center;font-size:.85rem}
+.cd .em{font-size:2.4rem}.cd button{padding:6px}.cd.on{border-color:#ffd24a}
+.lv{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;width:100%}.lv button{padding:6px 0;font-size:.8rem;width:auto}
+#hud{position:fixed;inset:0;pointer-events:none;display:none;font-size:.95rem;text-shadow:0 0 4px #000}
+#hud>*{position:absolute}
+#hl{left:12px;top:calc(10px + env(safe-area-inset-top))}#hr{right:70px;top:calc(10px + env(safe-area-inset-top));font-size:1.8rem}
+#hb{left:12px;bottom:calc(12px + env(safe-area-inset-bottom));width:150px}
+.bar{height:8px;background:#222;margin:3px 0 7px}.bar i{display:block;height:100%;width:0}
+#hw{left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));text-align:center}
+#toast{position:fixed;top:12%;left:50%;transform:translateX(-50%);background:#000c;padding:8px 14px;border:1px solid var(--r);opacity:0;transition:opacity .3s;pointer-events:none;z-index:9}
+#mob{display:none}#mob *{position:fixed;pointer-events:auto}
+#joy{left:22px;bottom:calc(22px + env(safe-area-inset-bottom));width:110px;height:110px;border:2px solid #fff4;border-radius:50%}
+#kn{position:absolute!important;left:35px;top:35px;width:40px;height:40px;border-radius:50%;background:#fff5}
+.mb{border:2px solid #fff6;border-radius:50%;background:#0007;color:#fff;width:64px;height:64px;font-size:1.5rem;padding:0;max-width:none}
+#bSp{right:20px;bottom:calc(110px + env(safe-area-inset-bottom))}#bWp{right:96px;bottom:calc(40px + env(safe-area-inset-bottom))}
+#bPs{right:12px;top:calc(8px + env(safe-area-inset-top));width:48px;height:48px}
+</style></head><body>
+<canvas id="gl"></canvas><div id="vig"></div><div id="fl"></div><div id="toast"></div>
+<div id="hud"><div id="hl"></div><div id="hr"></div>
+<div id="hb">GEFAHR<div class="bar"><i id="bd" style="background:#e11"></i></div>AUSDAUER<div class="bar"><i id="bs" style="background:#3c9"></i></div></div>
+<div id="hw"></div></div>
+<div id="mob"><div id="joy"><div id="kn"></div></div><button class="mb" id="bSp">🏃</button><button class="mb" id="bWp">⚡</button><button class="mb" id="bPs">⏸</button></div>
+<div id="ui"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+const $=s=>document.querySelector(s),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),TS=2,isT='ontouchstart' in window||navigator.maxTouchPoints>0;
+// ---------- Daten ----------
+const SKINS=[{n:'Überlebender',e:'🧑',p:0,c:0xffe8c0},{n:'Fish',e:'🐟',p:150,c:0x55ccff},{n:'Strichmännchen',e:'🧍',p:250,c:0xffffff},{n:'Landstreicher',e:'🧔',p:400,c:0xcc9955},{n:'Business Mann',e:'🕴️',p:600,c:0xaabbdd},{n:'Karatekämpfer',e:'🥋',p:900,c:0xffaa44},{n:'Ninja',e:'🥷',p:1300,c:0x9955ff},{n:'Drache',e:'🐲',p:2000,c:0xff4422}];
+const WEAP={emp:{n:'EMP-Gerät',e:'⚡',p:300,dur:2.5,cd:25,d:'Betäubt das Monster'},shock:{n:'Schockwelle',e:'🌊',p:400,dur:5,cd:20,d:'Verlangsamt das Monster'},flash:{n:'Blendgranate',e:'💥',p:500,dur:5,cd:22,d:'Das Monster irrt orientierungslos umher'},freeze:{n:'Einfrieren',e:'❄️',p:800,dur:3.5,cd:35,d:'Hält das Monster an'}};
+const UPN={d:'Wirkungsdauer',c:'Abklingzeit',p:'Stärke'};
+const S0={j:0,lvl:1,max:1,skins:[0],sel:0,w:{},eq:null,vol:.6,sens:1};
+let S;try{S={...S0,...JSON.parse(localStorage.getItem('jembosSave'))}}catch(e){S=JSON.parse(JSON.stringify(S0))}
+const save=()=>{try{localStorage.setItem('jembosSave',JSON.stringify(S))}catch(e){}};
+const wst=k=>{const w=WEAP[k],u=S.w[k].u;return{dur:w.dur*(1+.15*u.d)*(1+.1*u.p),cd:Math.max(5,w.cd*(1-.08*u.c)),sf:Math.max(.1,.4-.06*u.p)}};
+// ---------- Sound (selbst erzeugt) ----------
+let AC,mg;
+function au(){if(!AC){AC=new(window.AudioContext||window.webkitAudioContext)();mg=AC.createGain();mg.connect(AC.destination);
+ [48,50.5].forEach(f=>{const o=AC.createOscillator(),g=AC.createGain();o.type='sawtooth';o.frequency.value=f;g.gain.value=.05;o.connect(g);g.connect(mg);o.start()})}
+ mg.gain.value=S.vol;if(AC.state==='suspended')AC.resume()}
+function tone(f,d,ty='sine',v=.3,f2){if(!AC)return;const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.type=ty;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(mg);o.start();o.stop(t+d)}
+const sfx={coin:()=>{tone(880,.12,'square',.15);setTimeout(()=>tone(1320,.25,'square',.15),110)},buy:()=>{tone(520,.1,'triangle',.3);setTimeout(()=>tone(780,.2,'triangle',.3),90)},
+ win:()=>[523,659,784,1046].forEach((f,i)=>setTimeout(()=>tone(f,.3,'triangle',.3),i*140)),over:()=>tone(220,1.3,'sawtooth',.5,35),growl:()=>tone(120,.8,'sawtooth',.25,50),
+ beat:()=>{tone(52,.16,'sine',.7,35);setTimeout(()=>tone(48,.18,'sine',.5,32),170)},zap:()=>tone(1200,.5,'sawtooth',.3,100)};
+// ---------- Three.js ----------
+const cv=$('#gl'),R=new THREE.WebGLRenderer({canvas:cv,antialias:false});R.setPixelRatio(Math.min(devicePixelRatio,1.5));
+const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(75,1,.1,50);cam.rotation.order='YXZ';sc.add(cam);
+const lamp=new THREE.PointLight(0xffe8c0,1.25,15,1.6);cam.add(lamp);sc.add(new THREE.AmbientLight(0x331818,.45));
+sc.background=new THREE.Color(0x040406);sc.fog=new THREE.FogExp2(0x040406,.13);
+function rs(){R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}addEventListener('resize',rs);rs();
+function tex(c){const k=document.createElement('canvas');k.width=k.height=64;const x=k.getContext('2d');x.fillStyle=c;x.fillRect(0,0,64,64);for(let i=0;i<350;i++){x.fillStyle=`rgba(0,0,0,${Math.random()*.35})`;x.fillRect(Math.random()*64,Math.random()*64,2+Math.random()*6,2+Math.random()*3)}const t=new THREE.CanvasTexture(k);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t}
+function mkMon(){const g=new THREE.Group(),b=new THREE.MeshStandardMaterial({color:0x2a0608,roughness:.8,emissive:0x200000}),em=new THREE.MeshBasicMaterial({color:0xff2020});
+ const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);g.add(o)};
+ add(new THREE.BoxGeometry(.9,1.6,.6),b,0,1,0);add(new THREE.SphereGeometry(.4,10,8),b,0,2.1,0);
+ [-.15,.15].forEach(x=>add(new THREE.SphereGeometry(.07,6,6),em,x,2.15,.33));[-.65,.65].forEach(x=>add(new THREE.BoxGeometry(.2,1.5,.2),b,x,1.1,.1));
+ const l=new THREE.PointLight(0xff1010,.9,8);l.position.y=2;g.add(l);return g}
+// ---------- Labyrinth ----------
+const DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
+function bfs(g,w,h,sx,sy){const d=new Int32Array(w*h).fill(-1),q=[[sx,sy]];d[sy*w+sx]=0;for(let i=0;i<q.length;i++){const[x,y]=q[i];for(const[a,b]of DIRS){const nx=x+a,ny=y+b;if(g[ny]&&g[ny][nx]===0&&d[ny*w+nx]<0){d[ny*w+nx]=d[y*w+x]+1;q.push([nx,ny])}}}return d}
+function genMaze(lv){
+ const n=Math.min(4+Math.floor(lv*.42),46),m=Math.min(4+Math.floor(lv*.36),40),w=2*n+1,h=2*m+1,g=Array.from({length:h},()=>Array(w).fill(1)),st=[[1,1]];g[1][1]=0;
+ while(st.length){const[x,y]=st[st.length-1],nb=[[2,0],[-2,0],[0,2],[0,-2]].map(([a,b])=>[x+a,y+b,a,b]).filter(([a,b])=>a>0&&b>0&&a<w-1&&b<h-1&&g[b][a]);
+  if(!nb.length){st.pop();continue}const[a,b,dx,dy]=nb[Math.random()*nb.length|0];g[y+dy/2][x+dx/2]=0;g[b][a]=0;st.push([a,b])}
+ let loops=Math.round(w*h/120*(1-lv/150));
+ for(let i=0;i<2000&&loops>0;i++){const x=1+Math.random()*(w-2)|0,y=1+Math.random()*(h-2)|0;if((x+y)%2===1&&g[y][x]){g[y][x]=0;loops--}}
+ const d=bfs(g,w,h,1,1);let mx=0,ex=1,ey=1;
+ for(let y=1;y<h;y+=2)for(let x=1;x<w;x+=2)if(d[y*w+x]>mx){mx=d[y*w+x];ex=x;ey=y}
+ let bx=1,by=1,bb=1e9;for(let y=1;y<h;y+=2)for(let x=1;x<w;x+=2){const e=Math.abs(d[y*w+x]-mx*.55);if(e<bb){bb=e;bx=x;by=y}}
+ return{g,w,h,ex,ey,mx:bx,my:by,len:mx}}
+let G=null,objs=[],mode='menu';
+function build(L){
+ objs.forEach(o=>{sc.remove(o);o.geometry&&o.geometry.dispose()});objs=[];const{g,w,h}=L,add=o=>{sc.add(o);objs.push(o);return o};
+ const ws=[];for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(g[y][x]&&DIRS.some(([a,b])=>g[y+b]&&g[y+b][x+a]===0))ws.push([x,y]);
+ const wm=new THREE.MeshStandardMaterial({map:tex('#4b4540'),roughness:1}),im=new THREE.InstancedMesh(new THREE.BoxGeometry(TS,2.6,TS),wm,ws.length),o=new THREE.Object3D();
+ ws.forEach(([x,y],i)=>{o.position.set((x+.5)*TS,1.3,(y+.5)*TS);o.updateMatrix();im.setMatrixAt(i,o.matrix)});im.frustumCulled=false;add(im);
+ const fm=new THREE.MeshStandardMaterial({map:tex('#2a2620'),roughness:1});fm.map.repeat.set(w,h);
+ const fl=add(new THREE.Mesh(new THREE.PlaneGeometry(w*TS,h*TS),fm));fl.rotation.x=-Math.PI/2;fl.position.set(w*TS/2,0,h*TS/2);
+ const cl=add(new THREE.Mesh(new THREE.PlaneGeometry(w*TS,h*TS),new THREE.MeshStandardMaterial({color:0x111111,roughness:1})));cl.rotation.x=Math.PI/2;cl.position.set(w*TS/2,2.6,h*TS/2);
+ const ex=add(new THREE.Mesh(new THREE.BoxGeometry(.8,2.2,.8),new THREE.MeshBasicMaterial({color:0x44ff88})));ex.position.set((L.ex+.5)*TS,1.1,(L.ey+.5)*TS);
+ const el=new THREE.PointLight(0x44ff88,1.4,12);el.position.set(0,1.2,0);ex.add(el);
+ const mo=add(mkMon());mo.scale.setScalar(1+G.lvl/200);return{mesh:mo}}
+function wall(x,z,r=.35){for(let ty=Math.floor((z-r)/TS);ty<=Math.floor((z+r)/TS);ty++)for(let tx=Math.floor((x-r)/TS);tx<=Math.floor((x+r)/TS);tx++)if(!G.g[ty]||G.g[ty][tx]!==0)return true;return false}
+// ---------- Spiel ----------
+const K={};let jx=0,jy=0,spB=false;
+function start(lv){au();const L=genMaze(lv);
+ G={lvl:lv,...L,t:0,run:true,done:false,cd:0,grace:Math.max(6-lv*.04,2),hb:0,gl:5,
+  p:{x:1.5*TS,z:1.5*TS,yaw:0,pitch:0,st:100,sT:0,tired:false},
+  mon:{x:(L.mx+.5)*TS,z:(L.my+.5)*TS,tg:null,rt:0,stun:0,slow:0,sf:.4,blind:0,sT:0,pd:99},
+  ms:Math.min(2.3+lv*.032,5.6)*(lv>=76?1.08:1)*(lv===100?1.12:1),react:Math.max(.08,.7-lv*.006)};
+ G.par=L.len*TS/4.2*1.5;G.eq=S.eq&&S.w[S.eq]?S.eq:Object.keys(S.w)[0]||null;
+ G.mesh=build(L).mesh;G.dm=bfs(G.g,G.w,G.h,1,1);lamp.color.setHex(SKINS[S.sel].c);
+ mode='play';$('#ui').style.display='none';$('#hud').style.display='block';$('#vig').style.opacity=0;if(isT)$('#mob').style.display='block';
+ $('#hr').textContent=SKINS[S.sel].e;lock()}
+function lock(){if(!isT&&cv.requestPointerLock)cv.requestPointerLock()}
+function nxt(){const tx=G.mon.x/TS|0,ty=G.mon.z/TS|0,nb=DIRS.filter(([a,b])=>G.g[ty+b][tx+a]===0);if(!nb.length)return null;
+ if(G.mon.blind>0)return nb[Math.random()*nb.length|0];let best=null,bd=1e9;for(const[a,b]of nb){const d=G.dm[(ty+b)*G.w+tx+a];if(d<bd){bd=d;best=[a,b]}}return best}
+function tick(dt){
+ const p=G.p,mo=G.mon;G.t+=dt;G.cd=Math.max(0,G.cd-dt);
+ let fx=(K.KeyD?1:0)-(K.KeyA?1:0)+jx,fz=(K.KeyW?1:0)-(K.KeyS?1:0)-jy;const l=Math.hypot(fx,fz);if(l>1){fx/=l;fz/=l}
+ if(p.st<=0)p.tired=true;if(p.st>25)p.tired=false;
+ const sp=(K.ShiftLeft||K.ShiftRight||spB)&&l>.1&&!p.tired;p.st=clamp(p.st+(sp?-26:14)*dt,0,100);
+ const v=sp?6.4:4.2,s=Math.sin(p.yaw),c=Math.cos(p.yaw),dx=(fx*c-fz*s)*v*dt,dz=(-fx*s-fz*c)*v*dt;
+ if(!wall(p.x+dx,p.z))p.x+=dx;if(!wall(p.x,p.z+dz))p.z+=dz;
+ if(l>.1&&(p.sT-=dt*v/4.2)<=0){tone(85+Math.random()*20,.08,'triangle',.18,50);p.sT=.45}
+ cam.position.set(p.x,1.4+(l>.1?Math.sin(G.t*9)*.035:0),p.z);cam.rotation.set(p.pitch,p.yaw,0);
+ // Monster
+ const ptx=p.x/TS|0,pty=p.z/TS|0;
+ if(G.grace>0)G.grace-=dt;else{
+  if((mo.rt-=dt)<=0){G.dm=bfs(G.g,G.w,G.h,ptx,pty);mo.rt=G.react}
+  mo.stun-=dt;mo.slow-=dt;mo.blind-=dt;const mtx=mo.x/TS|0,mty=mo.z/TS|0;mo.pd=G.dm[mty*G.w+mtx];
+  let ms=G.ms*(mo.pd<8?1.12:mo.pd>25?.8:1);if(mo.slow>0)ms*=mo.sf;if(mo.stun>0)ms=0;
+  if(ms>0){let tg;if(mo.pd===0&&mo.blind<=0)tg={x:p.x,z:p.z};else{if(!mo.tg||Math.hypot(mo.x-mo.tg.x,mo.z-mo.tg.z)<.05){const n=nxt();mo.tg=n?{x:(mtx+n[0]+.5)*TS,z:(mty+n[1]+.5)*TS}:null}tg=mo.tg}
+   if(tg){const ddx=tg.x-mo.x,ddz=tg.z-mo.z,dd=Math.hypot(ddx,ddz)||1,st=Math.min(dd,ms*dt);mo.x+=ddx/dd*st;mo.z+=ddz/dd*st;G.mesh.rotation.y=Math.atan2(ddx,ddz)}
+   if((mo.sT-=dt)<=0){tone(60,.2,'square',clamp(.4-mo.pd*.02,0,.4),35);mo.sT=.42}}
+  if((G.gl-=dt)<=0){if(mo.pd<22)sfx.growl();G.gl=7+Math.random()*8}
+  if(Math.hypot(p.x-mo.x,p.z-mo.z)<.9+G.lvl/300)return over()}
+ mo.pd=G.dm[(mo.z/TS|0)*G.w+(mo.x/TS|0)];
+ G.mesh.position.set(mo.x,Math.sin(G.t*10)*.05,mo.z);
+ const dg=clamp(1-(mo.pd-3)/18,0,1);if(dg>.3&&(G.hb-=dt)<=0){sfx.beat();G.hb=1.1-dg*.7}
+ $('#vig').style.opacity=Math.min(1,dg*.85+Math.sin(G.t*(4+dg*12))*.12*dg);
+ if(Math.hypot(p.x-(G.ex+.5)*TS,p.z-(G.ey+.5)*TS)<1.3)return win();
+ $('#bd').style.width=dg*100+'%';$('#bs').style.width=p.st+'%';
+ $('#hl').innerHTML=`LEVEL ${G.lvl} / 100<br>🪙 ${S.j}`;
+ $('#hw').innerHTML=G.eq?`${WEAP[G.eq].e} ${WEAP[G.eq].n} – ${G.cd>0?Math.ceil(G.cd)+' s':'BEREIT (E)'}`:(S.max>=15?'Keine Waffe – im Shop kaufen':'')}
+function useW(){if(mode!=='play'||!G.eq||G.cd>0)return;const k=G.eq,w=wst(k),mo=G.mon,f=WEAP[k].d;G.cd=w.cd;sfx.zap();$('#fl').style.opacity=.7;setTimeout(()=>$('#fl').style.opacity=0,80);
+ if(k==='emp'||k==='freeze')mo.stun=w.dur;if(k==='shock'){mo.slow=w.dur;mo.sf=w.sf}if(k==='flash'){mo.blind=w.dur;mo.tg=null}}
+function cycW(){const ks=Object.keys(S.w);if(ks.length>1&&G){G.eq=ks[(ks.indexOf(G.eq)+1)%ks.length];S.eq=G.eq;save()}}
+function over(){if(G.done)return;G.done=true;G.run=false;mode='over';unlock();sfx.over();$('#vig').style.opacity=1;scr(`<div class="pn"><h1 style="font-size:2.6rem">GAME OVER</h1><p>Das Monster hat dich erwischt.</p><button class="pri" data-a="go" data-b="${G.lvl}">Level ${G.lvl} erneut starten</button><button data-a="menu">Hauptmenü</button></div>`)}
+function win(){if(G.done)return;G.done=true;G.run=false;mode='over';unlock();const lv=G.lvl,base=10+lv*3,fast=G.t<G.par?5+lv:0,mile=lv%10===0?50+lv*2:0,tot=base+fast+mile;
+ S.j+=tot;S.lvl=Math.min(100,lv+1);S.max=Math.max(S.max,S.lvl);save();sfx.win();setTimeout(sfx.coin,500);$('#vig').style.opacity=0;
+ const t=Math.round(G.t);
+ if(lv===100)return scr(`<div class="pn"><h1 style="font-size:2.4rem">DU HAST ES GESCHAFFT</h1><h3>ALLE 100 LEVEL BEZWUNGEN</h3><p>Das Monster ist besiegt – zumindest bis zum nächsten Albtraum.</p><p class="jb">+${tot} Jembos · Gesamt ${S.j}</p><button class="pri" data-a="menu">Hauptmenü</button></div>`);
+ scr(`<div class="pn"><h1 style="font-size:2.4rem">LEVEL GESCHAFFT!</h1><p>Zeit: ${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}</p><p>Belohnung: ${base} 🪙${fast?`<br>Zeitbonus: ${fast} 🪙`:''}${mile?`<br>Meilenstein-Bonus: ${mile} 🪙`:''}</p><p class="jb">+${tot} Jembos · Gesamt ${S.j}</p><button class="pri" data-a="go" data-b="${S.lvl}">Nächstes Level (${S.lvl})</button><button data-a="menu">Hauptmenü</button></div>`)}
+function pause(){if(mode!=='play')return;mode='pause';G.run=false;unlock();scr(`<div class="pn"><h2>PAUSE</h2><button class="pri" data-a="resume">Weiter</button><button data-a="go" data-b="${G.lvl}">Level neu starten</button><button data-a="menu">Hauptmenü</button></div>`)}
+function unlock(){if(document.exitPointerLock)document.exitPointerLock();$('#mob').style.display='none'}
+// ---------- Menüs ----------
+const UI=$('#ui');
+function scr(h){UI.innerHTML=h;UI.style.display='flex';$('#hud').style.display='none'}
+function toast(t){const e=$('#toast');e.textContent=t;e.style.opacity=1;clearTimeout(e.t);e.t=setTimeout(()=>e.style.opacity=0,1800)}
+const pnl=(t,b)=>`<div class="pn"><h2>${t}</h2><div class="jb">🪙 ${S.j} Jembos</div>${b}<button data-a="menu">Zurück</button></div>`;
+function menu(){mode='menu';scr(`<div class="pn"><h1>JEMBOS</h1><h3>ESCAPE THE MONSTER</h3><div class="st"><span>Level ${S.lvl}</span><span>🪙 ${S.j}</span><span>${SKINS[S.sel].e} ${SKINS[S.sel].n}</span><span>Rekord: Level ${S.max}</span></div>
+<button class="pri" data-a="go" data-b="${S.lvl}">SPIELEN</button><button data-a="levels">LEVEL AUSWÄHLEN</button><button data-a="skins">SKIN-SHOP</button><button data-a="weapons">WAFFEN-SHOP</button><button data-a="ups">UPGRADES</button><button data-a="set">EINSTELLUNGEN</button><button data-a="help">SPIELANLEITUNG</button></div>`)}
+const locked=()=>`<p>🔒 Der Waffen-Shop wird ab Level 15 freigeschaltet (dein Rekord: Level ${S.max}).</p>`;
+function skins(){scr(pnl('SKIN-SHOP','<div class="gr">'+SKINS.map((s,i)=>{const o=S.skins.includes(i);return`<div class="cd ${S.sel===i?'on':''}"><div class="em" style="filter:drop-shadow(0 0 8px #${s.c.toString(16).padStart(6,'0')})">${s.e}</div><b>${s.n}</b><button data-a="skin" data-b="${i}">${S.sel===i?'Ausgerüstet':o?'Ausrüsten':'Kaufen · '+s.p+' 🪙'}</button></div>`}).join('')+'</div>'))}
+function weapons(){if(S.max<15)return scr(pnl('WAFFEN-SHOP',locked()));scr(pnl('WAFFEN-SHOP','<div class="gr">'+Object.entries(WEAP).map(([k,w])=>{const o=S.w[k];return`<div class="cd ${S.eq===k?'on':''}"><div class="em">${w.e}</div><b>${w.n}</b><small>${w.d}</small><small>${o?wst(k).dur.toFixed(1)+' s · Abklingzeit '+wst(k).cd.toFixed(0)+' s':w.dur+' s · Abklingzeit '+w.cd+' s'}</small><button data-a="weap" data-b="${k}">${S.eq===k?'Ausgerüstet':o?'Ausrüsten':'Kaufen · '+w.p+' 🪙'}</button></div>`}).join('')+'</div>'))}
+function ups(){if(S.max<15)return scr(pnl('UPGRADES',locked()));const ks=Object.keys(S.w);scr(pnl('UPGRADES',ks.length?ks.map(k=>`<div class="cd" style="width:100%"><b>${WEAP[k].e} ${WEAP[k].n}</b>${Object.keys(UPN).map(t=>{const u=S.w[k].u[t];return`<button data-a="up" data-b="${k}:${t}" ${u>=5?'disabled':''}>${UPN[t]} ${u}/5 ${u>=5?'(MAX)':'· '+150*(u+1)+' 🪙'}</button>`}).join('')}</div>`).join(''):'<p>Kaufe zuerst eine Waffe im Waffen-Shop.</p>'))}
+function levels(){scr(pnl('LEVEL AUSWÄHLEN','<div class="lv">'+Array.from({length:100},(_,i)=>`<button ${i+1>S.max?'disabled':''} data-a="go" data-b="${i+1}">${i+1}</button>`).join('')+'</div>'))}
+function sett(){scr(pnl('EINSTELLUNGEN',`<label>Lautstärke<br><input type="range" id="vol" min="0" max="1" step=".05" value="${S.vol}"></label><label>Maus-/Touch-Empfindlichkeit<br><input type="range" id="sens" min=".3" max="2.5" step=".1" value="${S.sens}"></label><button data-a="reset" style="border-color:#f33">Spielstand zurücksetzen</button>`))}
+function help(){scr(pnl('SPIELANLEITUNG','<p style="text-align:left;line-height:1.5">Finde den <b style="color:#4f8">grünen Ausgang</b>, bevor das Monster dich fängt. Pro Level erhältst du Jembos für Skins und (ab Level 15) Waffen. <br><br><b>PC:</b> WASD laufen · Maus umsehen · Shift sprinten · E Waffe · Q Waffe wechseln · ESC Pause<br><b>Handy:</b> Joystick links, rechts wischen zum Umsehen, Buttons für Sprint, Waffe, Pause.<br><br>Rote Ränder und Herzschlag warnen dich, wenn das Monster nah ist. Waffen schwächen es nur kurz.</p>'))}
+function act(a,b){switch(a){
+ case'menu':menu();break;case'go':start(+b);break;case'resume':mode='play';G.run=true;UI.style.display='none';$('#hud').style.display='block';if(isT)$('#mob').style.display='block';lock();break;
+ case'levels':levels();break;case'skins':skins();break;case'weapons':weapons();break;case'ups':ups();break;case'set':sett();break;case'help':help();break;
+ case'skin':{const i=+b,s=SKINS[i];if(!S.skins.includes(i)){if(S.j<s.p)return toast('Nicht genug Jembos!');S.j-=s.p;S.skins.push(i);sfx.buy()}S.sel=i;save();skins();break}
+ case'weap':{const w=WEAP[b];if(!S.w[b]){if(S.j<w.p)return toast('Nicht genug Jembos!');S.j-=w.p;S.w[b]={u:{d:0,c:0,p:0}};sfx.buy()}S.eq=b;save();weapons();break}
+ case'up':{const[k,t]=b.split(':'),u=S.w[k].u[t],c=150*(u+1);if(u>=5)return;if(S.j<c)return toast('Nicht genug Jembos!');S.j-=c;S.w[k].u[t]++;sfx.buy();save();ups();break}
+ case'reset':if(confirm('Wirklich den gesamten Spielstand löschen?')){S=JSON.parse(JSON.stringify(S0));save();menu()}break}}
+UI.onclick=e=>{const a=e.target.closest('[data-a]');if(a&&!a.disabled){au();act(a.dataset.a,a.dataset.b)}};
+UI.oninput=e=>{if(e.target.id==='vol'){S.vol=+e.target.value;if(mg)mg.gain.value=S.vol}if(e.target.id==='sens')S.sens=+e.target.value;save()};
+// ---------- Eingabe ----------
+addEventListener('keydown',e=>{K[e.code]=true;if(e.code==='KeyE')useW();if(e.code==='KeyQ')cycW();if(e.code==='Escape')pause()});
+addEventListener('keyup',e=>K[e.code]=false);
+addEventListener('mousemove',e=>{if(mode==='play'&&document.pointerLockElement){G.p.yaw-=e.movementX*.0022*S.sens;G.p.pitch=clamp(G.p.pitch-e.movementY*.0022*S.sens,-1.4,1.4)}});
+document.addEventListener('pointerlockchange',()=>{if(!document.pointerLockElement&&mode==='play'&&!isT)pause()});
+cv.addEventListener('mousedown',()=>{if(mode==='play'&&!document.pointerLockElement)lock();else useW()});
+addEventListener('blur',pause);
+let tj=null,tl=null;
+addEventListener('touchstart',e=>{if(mode!=='play')return;for(const t of e.changedTouches){if(t.target.closest('.mb'))continue;if(t.clientX<innerWidth/2&&!tj)tj={id:t.identifier,x:t.clientX,y:t.clientY};else if(!tl)tl={id:t.identifier,x:t.clientX,y:t.clientY}}},{passive:false});
+addEventListener('touchmove',e=>{e.preventDefault();if(mode!=='play')return;for(const t of e.changedTouches){if(tj&&t.identifier===tj.id){jx=clamp((t.clientX-tj.x)/45,-1,1);jy=clamp((t.clientY-tj.y)/45,-1,1);$('#kn').style.transform=`translate(${jx*30}px,${jy*30}px)`}
+ else if(tl&&t.identifier===tl.id){G.p.yaw-=(t.clientX-tl.x)*.005*S.sens;G.p.pitch=clamp(G.p.pitch-(t.clientY-tl.y)*.005*S.sens,-1.4,1.4);tl.x=t.clientX;tl.y=t.clientY}}},{passive:false});
+const tend=e=>{for(const t of e.changedTouches){if(tj&&t.identifier===tj.id){tj=null;jx=jy=0;$('#kn').style.transform=''}if(tl&&t.identifier===tl.id)tl=null}};
+addEventListener('touchend',tend);addEventListener('touchcancel',tend);
+$('#bSp').onpointerdown=()=>spB=true;$('#bSp').onpointerup=$('#bSp').onpointerleave=()=>spB=false;$('#bWp').onclick=useW;$('#bPs').onclick=pause;
+// ---------- Start ----------
+let last=performance.now();
+(function loop(n){requestAnimationFrame(loop);const dt=Math.min(.05,(n-last)/1000);last=n;if(G&&G.run&&mode==='play')tick(dt);R.render(sc,cam)})(last);
+menu();
+</script></body></html>
